@@ -1,0 +1,6 @@
+{
+  "name": "Company & Dealer Management System",
+  "description": "একটি ডিলার, খুচরা দোকানদার, পণ্য এবং অর্ডার ব্যবস্থাপনা অ্যাপ্লিকেশন যা কোম্পানির মালিকদের জন্য লাভ-লোকসান এবং ডিলারদের জন্য অর্ডার ব্যবস্থাপনাকে সহজ করে তোলে।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
