@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, ShieldCheck, Users, Globe, LogOut, ArrowRightLeft, 
-  HelpCircle, RefreshCw
+  HelpCircle, RefreshCw, Bell, BellRing, CheckCircle2, AlertTriangle, X, Volume2, Briefcase, Store, Package, TrendingUp
 } from 'lucide-react';
 import { Language, UserRole, Dealer, Shop, Product, Order, Expense, Investment } from './types';
 import { 
@@ -16,8 +16,56 @@ import {
 import AdminDashboard from './components/AdminDashboard';
 import DealerDashboard from './components/DealerDashboard';
 import AuthScreen from './components/AuthScreen';
-import { auth } from './firebase';
+import { auth, messaging } from './firebase';
+import { onMessage } from 'firebase/messaging';
 import { signOut } from 'firebase/auth';
+
+// Web Audio API helper to generate crisp, friendly chime sound instantly offline
+export function playNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    
+    // Note 1: Clear sweet tone
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+    gain1.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    
+    // Note 2: Harmonious chime offset for a crisp dual-tone chord
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(987.77, ctx.currentTime + 0.08); // B5
+    gain2.gain.setValueAtTime(0, ctx.currentTime);
+    gain2.gain.setValueAtTime(0.12, ctx.currentTime + 0.08);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.4);
+    
+    osc2.start(ctx.currentTime + 0.08);
+    osc2.stop(ctx.currentTime + 0.5);
+  } catch (err) {
+    console.warn("Audio Context could not be auto-played due to browser restrictions:", err);
+  }
+}
+
+interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  timestamp: Date;
+  read: boolean;
+}
 
 export default function App() {
   // Global configurations
@@ -45,6 +93,58 @@ export default function App() {
   // Custom confirmation dialog states
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Notification and toast states
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [activeToast, setActiveToast] = useState<AppNotification | null>(null);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+
+  // Global notification trigger
+  const triggerNotification = (
+    title: string, 
+    body: string, 
+    type: 'info' | 'success' | 'warning' | 'error' = 'info'
+  ) => {
+    const newNotif: AppNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      title,
+      body,
+      type,
+      timestamp: new Date(),
+      read: false
+    };
+
+    setNotifications(prev => [newNotif, ...prev].slice(0, 50));
+    setActiveToast(newNotif);
+    playNotificationSound();
+  };
+
+  // Auto-dismiss active toast notification
+  useEffect(() => {
+    if (activeToast) {
+      const timer = setTimeout(() => {
+        setActiveToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeToast]);
+
+  // Hook foreground Firebase messaging if supported
+  useEffect(() => {
+    if (messaging) {
+      try {
+        const unsubscribe = onMessage(messaging, (payload) => {
+          console.log("Foreground message received:", payload);
+          const title = payload.notification?.title || (lang === 'bn' ? 'নতুন বার্তা' : 'New Message');
+          const body = payload.notification?.body || (lang === 'bn' ? 'সিস্টেমে একটি নতুন আপডেট এসেছে।' : 'A new update was pushed to the system.');
+          triggerNotification(title, body, 'success');
+        });
+        return () => unsubscribe();
+      } catch (err) {
+        console.warn("FCM onMessage handler subscription failed:", err);
+      }
+    }
+  }, [lang]);
 
   // State loading from LocalStorage
   useEffect(() => {
@@ -287,14 +387,117 @@ export default function App() {
                 <span className="hidden sm:inline">{lang === 'bn' ? 'English' : 'বাংলা'}</span>
               </button>
 
-              {/* Reset state button */}
-              <button
-                onClick={handleResetToDefault}
-                className="p-2 sm:p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 transition-all cursor-pointer shrink-0"
-                title={lang === 'bn' ? 'ডাটা ডিফল্ট করুন' : 'Reset default values'}
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
+
+
+              {/* Notification Bell with Badge & Dropdown */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setShowNotificationPanel(!showNotificationPanel)}
+                  className="p-2 sm:p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl border border-slate-200/80 transition-all cursor-pointer relative"
+                  title={lang === 'bn' ? 'বিজ্ঞপ্তি এবং নোটিফিকেশন' : 'Notifications'}
+                >
+                  {notifications.filter(n => !n.read).length > 0 ? (
+                    <>
+                      <BellRing className="w-4 h-4 text-indigo-600 animate-bounce" />
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-[9px] font-black text-white flex items-center justify-center rounded-full animate-pulse">
+                        {notifications.filter(n => !n.read).length}
+                      </span>
+                    </>
+                  ) : (
+                    <Bell className="w-4 h-4" />
+                  )}
+                </button>
+
+                {/* Dropdown Menu */}
+                {showNotificationPanel && (
+                  <div className="absolute right-0 mt-2.5 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 p-4 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Bell className="w-4 h-4 text-indigo-600" />
+                        <h4 className="text-xs sm:text-sm font-black text-slate-800">
+                          {lang === 'bn' ? 'বিজ্ঞপ্তি ও নোটিফিকেশন' : 'Notifications'}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Send Test Notification Button */}
+                        <button
+                          onClick={() => {
+                            triggerNotification(
+                              lang === 'bn' ? 'সিস্টেম নোটিফিকেশন টেস্ট!' : 'Test Notification Spark!',
+                              lang === 'bn' ? 'আপনার অ্যাপের নোটিফিকেশন ও সুন্দর শব্দ সফলভাবে কাজ করছে!' : 'Visual notification popups and audio chimes are operating perfectly!',
+                              'success'
+                            );
+                          }}
+                          className="text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-lg hover:bg-indigo-100 transition-all cursor-pointer flex items-center gap-1"
+                          title={lang === 'bn' ? 'পরীক্ষামূলক শব্দ সহ নোটিফিকেশন পাঠান' : 'Test notification with audio'}
+                        >
+                          <Volume2 className="w-3 h-3 animate-pulse text-indigo-500" />
+                          <span>{lang === 'bn' ? 'টেস্ট করুন' : 'Test Audio'}</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => setShowNotificationPanel(false)}
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400 space-y-2">
+                          <Bell className="w-8 h-8 mx-auto text-slate-300 stroke-[1.5]" />
+                          <p className="text-[11px] font-medium">
+                            {lang === 'bn' ? 'কোন নোটিফিকেশন নেই' : 'No recent notifications'}
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div 
+                            key={notif.id} 
+                            onClick={() => {
+                              setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                            }}
+                            className={`pt-2.5 pb-2 cursor-pointer transition-all rounded-lg px-2 hover:bg-slate-50 flex items-start gap-2.5 ${!notif.read ? 'bg-indigo-50/20' : ''}`}
+                          >
+                            <div className="mt-0.5 shrink-0">
+                              {notif.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                              {notif.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+                              {notif.type === 'error' && <X className="w-4 h-4 text-rose-500" />}
+                              {notif.type === 'info' && <Bell className="w-4 h-4 text-indigo-500" />}
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-0.5">
+                              <p className="text-xs font-black text-slate-800 leading-tight truncate">
+                                {notif.title}
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-slate-500 leading-relaxed font-medium">
+                                {notif.body}
+                              </p>
+                              <p className="text-[9px] text-slate-400 font-mono">
+                                {notif.timestamp.toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {notifications.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100 text-center">
+                        <button
+                          onClick={() => {
+                            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                          }}
+                          className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                        >
+                          {lang === 'bn' ? 'সব পঠিত হিসেবে চিহ্নিত করুন' : 'Mark all as read'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Separation line */}
               <div className="h-6 w-[1px] bg-slate-200 hidden sm:block shrink-0"></div>
@@ -412,6 +615,7 @@ export default function App() {
             onUpdateOrders={setOrders}
             onUpdateExpenses={setExpenses}
             onUpdateInvestments={setInvestments}
+            onTriggerNotification={triggerNotification}
           />
         ) : (
           <DealerDashboard
@@ -423,6 +627,7 @@ export default function App() {
             onUpdateShops={setShops}
             onUpdateOrders={setOrders}
             onUpdateDealers={setDealers}
+            onTriggerNotification={triggerNotification}
             loggedInDealerId={currentUser.role === 'dealer' ? currentUser.dealerId : undefined}
           />
         )}
@@ -471,36 +676,38 @@ export default function App() {
         </div>
       )}
 
-      {/* Modern Custom Reset Confirmation Modal */}
-      {showResetConfirm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="mx-auto w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 animate-pulse">
-              <RefreshCw className="w-6 h-6" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-black text-slate-900">
-                {lang === 'bn' ? 'রিসেট নিশ্চিতকরণ' : 'Confirm Reset'}
-              </h3>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                {lang === 'bn' ? 'আপনি কি সব ডাটা ডিফল্ট ভ্যালুতে রিসেট করতে চান? আপনার সব পরিবর্তন মুছে যাবে!' : 'Are you sure you want to reset all data to system defaults? All your changes will be lost!'}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-              >
-                {lang === 'bn' ? 'বাতিল' : 'Cancel'}
-              </button>
-              <button
-                onClick={confirmResetToDefault}
-                className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-100"
-              >
-                {lang === 'bn' ? 'রিসেট করুন' : 'Reset'}
-              </button>
-            </div>
+
+
+      {/* Toast Notification Container with Dual-tone Sound & Slide-in Animation */}
+      {activeToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm bg-slate-900 text-white rounded-3xl shadow-2xl p-4 border border-slate-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-6 duration-300">
+          <div className="mt-0.5 shrink-0 p-1.5 bg-slate-800 rounded-xl">
+            {activeToast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+            {activeToast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
+            {activeToast.type === 'error' && <X className="w-5 h-5 text-rose-400" />}
+            {activeToast.type === 'info' && <Bell className="w-5 h-5 text-indigo-400" />}
           </div>
+          
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs sm:text-sm font-black tracking-tight leading-snug">
+                {activeToast.title}
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-indigo-500/15 text-[8px] font-bold text-indigo-300 font-mono">
+                <Volume2 className="w-2.5 h-2.5 animate-pulse text-indigo-300" /> {lang === 'bn' ? 'শব্দ সক্রিয়' : 'SOUND'}
+              </span>
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-300 font-medium leading-relaxed">
+              {activeToast.body}
+            </p>
+          </div>
+
+          <button 
+            onClick={() => setActiveToast(null)}
+            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all shrink-0 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

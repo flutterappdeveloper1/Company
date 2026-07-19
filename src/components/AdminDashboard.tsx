@@ -31,6 +31,7 @@ interface AdminDashboardProps {
   onUpdateOrders: (orders: Order[]) => void;
   onUpdateExpenses: (expenses: Expense[]) => void;
   onUpdateInvestments: (investments: Investment[]) => void;
+  onTriggerNotification?: (title: string, body: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }
 
 export default function AdminDashboard({
@@ -46,7 +47,8 @@ export default function AdminDashboard({
   onUpdateProducts,
   onUpdateOrders,
   onUpdateExpenses,
-  onUpdateInvestments
+  onUpdateInvestments,
+  onTriggerNotification
 }: AdminDashboardProps) {
   const t = translations[lang];
   const [activeTab, setActiveTab] = useState<'financials' | 'dealers' | 'shops' | 'products' | 'orders' | 'expenses' | 'investments'>('financials');
@@ -127,6 +129,13 @@ export default function AdminDashboard({
       ...dealerForm
     };
     onUpdateDealers([...dealers, newDealer]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন ডিলার নিবন্ধিত!' : 'New Dealer Registered!',
+        lang === 'bn' ? `ডিলার "${newDealer.name}" সফলভাবে সিস্টেমে যুক্ত হয়েছেন।` : `Dealer "${newDealer.name}" has been added successfully.`,
+        'success'
+      );
+    }
     resetForms();
   };
 
@@ -165,6 +174,13 @@ export default function AdminDashboard({
       dealerId: dealerIdToUse
     };
     onUpdateShops([...shops, newShop]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন রিটেইল শপ যুক্ত!' : 'New Retail Shop Registered!',
+        lang === 'bn' ? `দোকান "${newShop.name}" সফলভাবে যুক্ত করা হয়েছে।` : `Shop "${newShop.name}" was successfully registered.`,
+        'success'
+      );
+    }
     resetForms();
   };
 
@@ -210,6 +226,13 @@ export default function AdminDashboard({
       stock: Number(productForm.stock)
     };
     onUpdateProducts([...products, newProduct]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন প্রোডাক্ট যুক্ত!' : 'New Product Added!',
+        lang === 'bn' ? `পণ্য "${newProduct.name}" সফলভাবে যুক্ত করা হয়েছে।` : `Product "${newProduct.name}" was added successfully.`,
+        'success'
+      );
+    }
     resetForms();
   };
 
@@ -258,6 +281,13 @@ export default function AdminDashboard({
       amount: Number(expenseForm.amount)
     };
     onUpdateExpenses([...expenses, newExpense]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন খরচ রেকর্ড!' : 'New Expense Recorded!',
+        lang === 'bn' ? `"${newExpense.title}" বাবদ ৳${newExpense.amount} খরচ হিসেবে নথিভুক্ত হয়েছে।` : `Expense of ৳${newExpense.amount} for "${newExpense.title}" has been recorded.`,
+        'info'
+      );
+    }
     resetForms();
   };
 
@@ -303,6 +333,13 @@ export default function AdminDashboard({
       amount: Number(investmentForm.amount)
     };
     onUpdateInvestments([...investments, newInvestment]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'কোম্পানি মূলধন বৃদ্ধি!' : 'Company Investment Added!',
+        lang === 'bn' ? `"${newInvestment.title}" বাবদ ৳${newInvestment.amount} মূলধন যুক্ত হয়েছে।` : `Investment of ৳${newInvestment.amount} for "${newInvestment.title}" has been added.`,
+        'success'
+      );
+    }
     resetForms();
   };
 
@@ -381,6 +418,19 @@ export default function AdminDashboard({
 
     onUpdateProducts(updatedProducts);
     onUpdateOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    if (onTriggerNotification) {
+      const statusTexts: Record<string, string> = {
+        'Pending': lang === 'bn' ? 'পেন্ডিং (Pending)' : 'Pending',
+        'Ready': lang === 'bn' ? 'প্রস্তুত (Ready)' : 'Ready',
+        'Delivered': lang === 'bn' ? 'ডেলিভার্ড করা হয়েছে (Delivered)' : 'Delivered',
+        'Cancelled': lang === 'bn' ? 'বাতিল করা হয়েছে (Cancelled)' : 'Cancelled'
+      };
+      onTriggerNotification(
+        lang === 'bn' ? 'অর্ডারের স্ট্যাটাস পরিবর্তন!' : 'Order Status Updated!',
+        lang === 'bn' ? `অর্ডার #${orderId} এর বর্তমান অবস্থা: ${statusTexts[newStatus]}` : `Order #${orderId} status changed to ${statusTexts[newStatus]}`,
+        newStatus === 'Cancelled' ? 'warning' : 'success'
+      );
+    }
   };
 
   const handleDeleteOrder = (id: string) => {

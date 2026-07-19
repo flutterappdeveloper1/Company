@@ -22,6 +22,7 @@ interface DealerDashboardProps {
   onUpdateShops: (shops: Shop[]) => void;
   onUpdateOrders: (orders: Order[]) => void;
   onUpdateDealers?: (dealers: Dealer[]) => void;
+  onTriggerNotification?: (title: string, body: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   loggedInDealerId?: string;
 }
 
@@ -34,6 +35,7 @@ export default function DealerDashboard({
   onUpdateShops,
   onUpdateOrders,
   onUpdateDealers,
+  onTriggerNotification,
   loggedInDealerId
 }: DealerDashboardProps) {
   const t = translations[lang];
@@ -130,6 +132,13 @@ export default function DealerDashboard({
     };
 
     onUpdateShops([...shops, newShop]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন রিটেইল শপ যুক্ত!' : 'New Retail Shop Registered!',
+        lang === 'bn' ? `দোকান "${newShop.name}" সফলভাবে যুক্ত করা হয়েছে।` : `Shop "${newShop.name}" was successfully registered.`,
+        'success'
+      );
+    }
     resetShopForm();
     
     // Custom Toast instead of blocking window.alert
@@ -238,6 +247,13 @@ export default function DealerDashboard({
     };
 
     onUpdateOrders([...orders, newOrder]);
+    if (onTriggerNotification) {
+      onTriggerNotification(
+        lang === 'bn' ? 'নতুন অর্ডার বুকিং!' : 'New Order Booked!',
+        lang === 'bn' ? `দোকান "${newOrder.shopName}" এর জন্য ৳${newOrder.totalSellingPrice} মূল্যের অর্ডার বুক করা হয়েছে।` : `Order of ৳${newOrder.totalSellingPrice} was booked for "${newOrder.shopName}".`,
+        'success'
+      );
+    }
     
     // Clear state
     setBasket([]);
